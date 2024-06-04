@@ -6,6 +6,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -22,16 +23,23 @@ public class ResourceResolver {
         List<T> reply = new ArrayList<>();
         Stream<Path> paths = null;
 
-        try {
-            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-            String basePackagePath = basePackage.replace(".", "/");
-            URL resourceURL = contextClassLoader.getResource(basePackagePath);
-            if (resourceURL != null) {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        String basePackagePath = basePackage.replace(".", "/");
+        Enumeration<URL> resources = contextClassLoader.getResources(basePackagePath);
+        while (resources.hasMoreElements()) {
+            try {
+                URL resourceURL = resources.nextElement();
                 URI uri = resourceURL.toURI();
-//                Path path = FileSystems
-//                        .newFileSystem(uri, Map.of())
-//                        .getPath(basePackagePath);
-                Path path = Paths.get(uri);
+                Path path = null;
+                if (uri.getScheme().equals("jar")) {
+                    // 如果basePackagePath是jar包路径
+                    String[] split = uri.toString().split("!");
+                    FileSystem fileSystem = FileSystems.newFileSystem(URI.create(split[0]), Map.of());
+                    path = fileSystem.getPath(basePackagePath);
+                } else {
+                    // 如果basePackagePath是文件路径
+                    path = Paths.get(uri);
+                }
                 paths = Files.walk(path);
                 paths.filter(Files::isRegularFile).forEach(file -> {
                     String name = file.getFileName().toString();
@@ -41,10 +49,10 @@ public class ResourceResolver {
                         reply.add(apply);
                     }
                 });
-            }
-        } finally {
-            if (paths != null) {
-                paths.close();
+            } finally {
+                if (paths != null) {
+                    paths.close();
+                }
             }
         }
         return reply;
