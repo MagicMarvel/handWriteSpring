@@ -57,9 +57,11 @@ public class PropertyResolver {
 
 
     /**
-     * 根据key获取属性值，key有可能是一个${abc.xyz:defaultValue}这样的表达式
+     * 根据key获取属性值，key有可能是一个${abc.xyz:defaultValue}这样的表达式，只会返回String类型的值，要返回其它指定的类型的值，需要使用另一个API
+     * getProperty(String key, Class<T> type)
+     *
      * @param key key有可能是一个${abc.xyz:defaultValue}这样的表达式
-     * @return key对应的属性值
+     * @return key对应的属性值，只会返回String类型的值
      */
     @Nullable
     public String getProperty(String key) {
@@ -68,7 +70,7 @@ public class PropertyResolver {
         if (keyExpr != null) {
             if (keyExpr.defaultValue() != null) {
                 // 带默认值查询:
-                return getProperty(keyExpr.key(), keyExpr.defaultValue());
+                return getProperty(keyExpr.key(), getProperty(keyExpr.defaultValue()));
             } else {
                 // 不带默认值查询:
                 return getProperty(keyExpr.key());
@@ -85,9 +87,10 @@ public class PropertyResolver {
     }
 
     /**
-     * 负责转换一个属性查出来的value，如果这个value是一个${}查询，则递归再去查这个表达式的value
+     * 负责解决一个属性value也是${}查询的问题，如果这个value是一个${}查询，则递归再去查这个表达式的value
      * 如果不是${}查询，则直接返回这个value
-     * @param value 一个属性查出来的value，可能是一个${}查询，现解析它
+     *
+     * @param value 一个属性查出来的value，可能是一个${}查询，解析它
      * @return 解析后的value
      */
     String parseValue(String value) {
@@ -104,21 +107,48 @@ public class PropertyResolver {
     }
 
     /**
-     * 获取key对应的值，若key不存在，则返回defaultValue，这个key不会是一个${}表达式
-     * @param key key
+     * 获取key对应的值，若key不存在，则返回defaultValue，这个key可以是一个${}表达式
+     *
+     * @param key          key
      * @param defaultValue 默认值
      * @return key对应的属性值
      */
-    private String getProperty(String key, String defaultValue) {
-        String value = this.properties.get(key);
+    public String getProperty(String key, String defaultValue) {
+        String value = getProperty(key);
         if (value != null) {
-            return convert(value.getClass(), value);
+            return value;
         }
         return defaultValue;
     }
 
     /**
+     * 获取key对应的值，并转换为指定的类型
+     *
+     * @param key  key
+     * @param type 类型
+     * @param <T>  类型
+     * @return key对应类型的值
+     */
+    public <T> T getProperty(String key, Class<T> type) {
+        return convert(type, getProperty(key));
+    }
+
+    /**
+     * 获取key对应的值，并转换为指定的类型，若key不存在，则返回defaultValue
+     *
+     * @param key          key
+     * @param type         类型
+     * @param defaultValue 默认值
+     * @param <T>          类型
+     * @return key对应类型的值
+     */
+    public <T> T getProperty(String key, Class<T> type, T defaultValue) {
+        return convert(type, getProperty(key, defaultValue.toString()));
+    }
+
+    /**
      * 将形如${abc.xyz:defaultValue}这样的key解析成PropertyExpr
+     *
      * @param key 形如${abc.xyz:defaultValue}这样的key
      * @return PropertyExpr，若不为${}表达式，则返回null
      */
@@ -140,7 +170,8 @@ public class PropertyResolver {
         return null;
     }
 
-    <T> T convert(Class<?> clazz, String value) {
+    @SuppressWarnings("unchecked")
+    <T> T convert(Class<T> clazz, String value) {
         Function<String, Object> fn = this.converters.get(clazz);
         if (fn == null) {
             throw new IllegalArgumentException("Unsupported value type: " + clazz.getName());
@@ -148,4 +179,10 @@ public class PropertyResolver {
         return (T) fn.apply(value);
     }
 
+    public void getRequiredProperty(String key) {
+        String value = getProperty(key);
+        if (value == null) {
+            throw new NullPointerException("No such property: " + key);
+        }
+    }
 }
