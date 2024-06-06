@@ -4,7 +4,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.sql.DataSourceDefinition;
-import com.magicmarvel.handWriteSpring.io.resource.ResourceResolver;
 import org.junit.Test;
 import jakarta.annotation.sub.AnnoScan;
 import org.slf4j.Logger;
