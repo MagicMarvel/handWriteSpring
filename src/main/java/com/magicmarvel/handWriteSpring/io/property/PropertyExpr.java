@@ -1,4 +1,4 @@
-package com.magicmarvel.handWriteSpring.io;
+package com.magicmarvel.handWriteSpring.io.property;
 
 /**
  * 表示属性的类

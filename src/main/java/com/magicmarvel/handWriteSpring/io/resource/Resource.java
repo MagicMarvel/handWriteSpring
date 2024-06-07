@@ -1,4 +1,4 @@
-package com.magicmarvel.handWriteSpring.io;
+package com.magicmarvel.handWriteSpring.io.resource;
 
 /**
  * 资源类
