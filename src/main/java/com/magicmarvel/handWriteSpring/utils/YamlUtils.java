@@ -1,4 +1,4 @@
-package com.magicmarvel.handWriteSpring.io.utils;
+package com.magicmarvel.handWriteSpring.utils;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;

@@ -1,4 +1,4 @@
-package com.magicmarvel.handWriteSpring.io.utils;
+package com.magicmarvel.handWriteSpring.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

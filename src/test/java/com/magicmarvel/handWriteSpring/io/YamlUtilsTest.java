@@ -1,7 +1,7 @@
 package com.magicmarvel.handWriteSpring.io;
 
 
-import com.magicmarvel.handWriteSpring.io.utils.YamlUtils;
+import com.magicmarvel.handWriteSpring.utils.YamlUtils;
 import org.junit.Test;
 
 import java.util.Map;

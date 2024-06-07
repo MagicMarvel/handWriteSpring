@@ -1,4 +1,4 @@
-package com.magicmarvel.handWriteSpring.io.utils;
+package com.magicmarvel.handWriteSpring.utils;
 
 import java.io.IOException;
 import java.io.InputStream;
