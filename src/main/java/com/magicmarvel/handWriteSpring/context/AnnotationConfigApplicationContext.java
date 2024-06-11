@@ -1,7 +1,6 @@
 package com.magicmarvel.handWriteSpring.context;
 
-import com.magicmarvel.handWriteSpring.annotation.ComponentScan;
-import com.magicmarvel.handWriteSpring.annotation.Import;
+import com.magicmarvel.handWriteSpring.annotation.*;
 import com.magicmarvel.handWriteSpring.exception.BeanDefinitionException;
 import com.magicmarvel.handWriteSpring.io.property.PropertyResolver;
 import com.magicmarvel.handWriteSpring.io.resource.ResourceResolver;
@@ -10,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.*;
 
@@ -79,19 +79,32 @@ public class AnnotationConfigApplicationContext {
     }
 
     private Map<String, BeanDefinition> createBeanDefinitions(Set<String> beanClassNames) {
-        Map<String, BeanDefinition> beanDefinitions = new HashMap<>();
         for (String beanClassName : beanClassNames) {
             try {
                 Class<?> beanClass = Class.forName(beanClassName);
+                // 找到所有标记了Component的类，这些类都是Bean，Configuration也是Component
+                if (ClassUtils.findAnnotation(beanClass, Component.class) != null) {
+                    String beanName = ClassUtils.getBeanName(beanClass);
+                    BeanDefinition beanDefinition = new BeanDefinition(beanName, beanClass, beanClass.getConstructor());
+
+
+                    // 如果是Configuration，还要找到所有的标记为Bean的方法
+                    if (ClassUtils.findAnnotation(beanClass, Configuration.class) != null) {
+                        for (Method method : beanClass.getMethods()) {
+                            if (method.getAnnotation(Bean.class) != null) {
+                            }
+                        }
+                    }
+                }
                 String beanName = ClassUtils.getBeanName(beanClass);
                 BeanDefinition beanDefinition = new BeanDefinition(beanName, beanClass);
-                beanDefinitions.put(beanName, beanDefinition);
             } catch (ClassNotFoundException e) {
                 throw new BeanDefinitionException("Cannot find class: " + beanClassName, e);
             }
         }
         return null;
     }
+
 
     public BeanDefinition findBeanDefinition(String customAnnotation) {
         return null;
