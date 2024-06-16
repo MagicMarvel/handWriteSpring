@@ -1,6 +1,9 @@
 package com.magicmarvel.handWriteSpring.utils;
 
+import com.magicmarvel.handWriteSpring.annotation.Bean;
+
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 
 public class ClassUtils {
     public static <T extends Annotation> T findAnnotation(Class<?> target, Class<T> annoClass) {
@@ -23,5 +26,26 @@ public class ClassUtils {
 
     public static String getBeanName(Class<?> simpleComponentClass) {
         return null;
+    }
+
+    public static <T extends Annotation> Method findAnnotationMethod(Class<?> clazz, Class<T> annoClass) {
+        Method found = null;
+        for (Method method : clazz.getMethods()) {
+            if (found == null) {
+                if (method.getAnnotation(annoClass) != null) {
+                    found = method;
+                }
+            } else {
+                if (method.getAnnotation(annoClass) != null) {
+                    throw new RuntimeException("Duplicate @" + annoClass.getSimpleName() + " found on class " + clazz.getSimpleName());
+                }
+            }
+        }
+        return found;
+    }
+
+    public static String getBeanName(Method method) {
+        Bean bean = method.getAnnotation(Bean.class);
+        return bean.value().isEmpty() ? method.getName() : bean.value();
     }
 }

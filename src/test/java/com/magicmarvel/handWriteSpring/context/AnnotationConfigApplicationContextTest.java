@@ -12,16 +12,17 @@ import com.magicmarvel.scan.primary.StudentBean;
 import com.magicmarvel.scan.primary.TeacherBean;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Properties;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 public class AnnotationConfigApplicationContextTest {
 
     @Test
-    public void testAnnotationConfigApplicationContext() {
+    public void testAnnotationConfigApplicationContext() throws URISyntaxException, IOException {
         var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
         // @CustomAnnotation:
         assertNotNull(ctx.findBeanDefinition(CustomAnnotationBean.class));

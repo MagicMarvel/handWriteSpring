@@ -37,6 +37,7 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
     private Method initMethod;
     private Method destroyMethod;
 
+    // 用于@Component这样定义的bean
     public BeanDefinition(String name, Class<?> beanClass, Constructor<?> constructor, int order, boolean primary, String initMethodName,
                           String destroyMethodName, Method initMethod, Method destroyMethod) {
         this.name = name;
@@ -50,6 +51,7 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
         setInitAndDestroyMethod(initMethodName, destroyMethodName, initMethod, destroyMethod);
     }
 
+    // 用于@Bean这样定义的bean
     public BeanDefinition(String name, Class<?> beanClass, String factoryName, Method factoryMethod, int order, boolean primary, String initMethodName,
                           String destroyMethodName, Method initMethod, Method destroyMethod) {
         this.name = name;
