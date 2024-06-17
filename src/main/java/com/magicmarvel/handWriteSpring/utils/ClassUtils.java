@@ -24,8 +24,8 @@ public class ClassUtils {
         return found;
     }
 
-    public static String getBeanName(Class<?> simpleComponentClass) {
-        return null;
+    public static String getBeanName(Class<?> clazz) {
+        return clazz.getName();
     }
 
     public static <T extends Annotation> Method findAnnotationMethod(Class<?> clazz, Class<T> annoClass) {

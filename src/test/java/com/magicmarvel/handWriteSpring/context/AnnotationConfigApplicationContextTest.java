@@ -17,6 +17,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Properties;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 public class AnnotationConfigApplicationContextTest {

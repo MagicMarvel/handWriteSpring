@@ -21,7 +21,7 @@ public class AnnotationConfigApplicationContext {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final PropertyResolver propertyResolver;
-    private final Map<String, BeanDefinition> beans;
+    private Map<String, BeanDefinition> beans = new HashMap<>();
 
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException {
         this.propertyResolver = propertyResolver;
@@ -83,11 +83,12 @@ public class AnnotationConfigApplicationContext {
     }
 
     private Map<String, BeanDefinition> createBeanDefinitions(Set<String> beanClassNames) {
+        Map<String, BeanDefinition> beans = new HashMap<>();
         for (String beanClassName : beanClassNames) {
             try {
                 Class<?> beanClass = Class.forName(beanClassName);
                 // 找到所有标记了Component的类，这些类都是Bean，Configuration也是Component
-                if (ClassUtils.findAnnotation(beanClass, Component.class) != null) {
+                if (ClassUtils.findAnnotation(beanClass, Component.class) != null && !beanClass.isAnnotation()) {
                     String beanName = ClassUtils.getBeanName(beanClass);
                     BeanDefinition beanDefinition = new BeanDefinition(beanName,
                             beanClass,
@@ -98,6 +99,7 @@ public class AnnotationConfigApplicationContext {
                             null,
                             ClassUtils.findAnnotationMethod(beanClass, PostConstruct.class),
                             ClassUtils.findAnnotationMethod(beanClass, PreDestroy.class));
+                    logger.atDebug().log("Create bean definition by @Component: {}", beanDefinition);
                     beans.put(beanName, beanDefinition);
 
                     // 如果是Configuration，还要找到所有的标记为Bean的方法
@@ -118,6 +120,7 @@ public class AnnotationConfigApplicationContext {
                                         bean.destroyMethod() == null ? null : bean.destroyMethod(),
                                         null,
                                         null);
+                                logger.atDebug().log("Create bean definition by @Bean: {}", beanDefinition);
                                 beans.put(methodBeanName, methodBeanDefinition);
                             }
                         }
@@ -127,7 +130,7 @@ public class AnnotationConfigApplicationContext {
                 throw new BeanDefinitionException("Cannot find class: " + beanClassName, e);
             }
         }
-        return null;
+        return beans;
     }
 
     private int getOrder(Method method) {
@@ -179,12 +182,12 @@ public class AnnotationConfigApplicationContext {
         }
     }
 
-    public BeanDefinition findBeanDefinition(String customAnnotation) {
-        return null;
+    public BeanDefinition findBeanDefinition(String beanName) {
+        return beans.get(beanName);
     }
 
-    public BeanDefinition findBeanDefinition(Class<?> localDateConfigurationClass) {
-        return null;
+    public BeanDefinition findBeanDefinition(Class<?> clazz) {
+        return beans.get(clazz.getName());
     }
 
     public List<BeanDefinition> findBeanDefinitions(Class<?> personBeanClass) {
