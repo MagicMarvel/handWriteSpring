@@ -15,6 +15,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class AnnotationConfigApplicationContext {
@@ -88,7 +89,15 @@ public class AnnotationConfigApplicationContext {
             try {
                 Class<?> beanClass = Class.forName(beanClassName);
                 // 找到所有标记了Component的类，这些类都是Bean，Configuration也是Component
-                if (ClassUtils.findAnnotation(beanClass, Component.class) != null && !beanClass.isAnnotation()) {
+                if (ClassUtils.findAnnotation(beanClass, Component.class) != null &&
+                        !beanClass.isAnnotation() &&
+                        !beanClass.isInterface() &&
+                        !beanClass.isEnum() &&
+                        !beanClass.isPrimitive()
+                ) {
+                    if (Objects.equals(beanClassName, "com.magicmarvel.imported.ZonedDateConfiguration")) {
+                        System.out.println("aaa");
+                    }
                     String beanName = ClassUtils.getBeanName(beanClass);
                     BeanDefinition beanDefinition = new BeanDefinition(beanName,
                             beanClass,
@@ -102,13 +111,14 @@ public class AnnotationConfigApplicationContext {
                     logger.atDebug().log("Create bean definition by @Component: {}", beanDefinition);
                     beans.put(beanName, beanDefinition);
 
+
                     // 如果是Configuration，还要找到所有的标记为Bean的方法
-                    if (ClassUtils.findAnnotation(beanClass, Configuration.class) != null) {
-                        for (Method method : beanClass.getMethods()) {
-                            Bean bean = method.getAnnotation(Bean.class);
-                            if (bean != null) {
-                                String methodName = method.getName();
-                                String methodBeanName = ClassUtils.getBeanName(method);
+                    if (beanClass.isAnnotationPresent(Configuration.class)) {
+                        for (Method method : beanClass.getDeclaredMethods()) {
+                            if (method.isAnnotationPresent(Bean.class)) {
+                                String methodName = ClassUtils.getBeanName(method);
+                                System.out.println(methodName);
+                                Bean bean = method.getAnnotation(Bean.class);
                                 BeanDefinition methodBeanDefinition = new BeanDefinition(
                                         methodName,
                                         method.getReturnType(),
@@ -120,8 +130,8 @@ public class AnnotationConfigApplicationContext {
                                         bean.destroyMethod() == null ? null : bean.destroyMethod(),
                                         null,
                                         null);
-                                logger.atDebug().log("Create bean definition by @Bean: {}", beanDefinition);
-                                beans.put(methodBeanName, methodBeanDefinition);
+                                logger.atDebug().log("Create bean definition by @Bean: {}", methodBeanDefinition);
+                                beans.put(methodName, methodBeanDefinition);
                             }
                         }
                     }
@@ -186,11 +196,29 @@ public class AnnotationConfigApplicationContext {
         return beans.get(beanName);
     }
 
-    public BeanDefinition findBeanDefinition(Class<?> clazz) {
-        return beans.get(clazz.getName());
+    public List<BeanDefinition> findBeanDefinitions(Class<?> clazz) {
+        return this.beans.values().stream()
+                // filter by type and sub-type:
+                .filter(def -> clazz.isAssignableFrom(def.getBeanClass()))
+                // 排序:
+                .sorted().collect(Collectors.toList());
     }
 
-    public List<BeanDefinition> findBeanDefinitions(Class<?> personBeanClass) {
-        return null;
+    public BeanDefinition findBeanDefinition(Class<?> clazz) {
+        List<BeanDefinition> defs = findBeanDefinitions(clazz);
+        if (defs.isEmpty()) {
+            return null;
+        }
+        if (defs.size() == 1) {
+            return defs.getFirst();
+        }
+        List<BeanDefinition> list = defs.stream().filter(BeanDefinition::isPrimary).toList();
+        if (list.size() > 1) {
+            throw new BeanDefinitionException("Multiple primary beans found for class: " + clazz.getName());
+        }
+        if (list.isEmpty()) {
+            throw new BeanDefinitionException("No primary bean found for class: " + clazz.getName());
+        }
+        return list.getFirst();
     }
 }

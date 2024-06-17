@@ -1,6 +1,7 @@
 package com.magicmarvel.scan.custom.annotation;
 
 
+import com.magicmarvel.handWriteSpring.annotation.AliasFor;
 import com.magicmarvel.handWriteSpring.annotation.Component;
 
 import java.lang.annotation.*;
@@ -10,7 +11,6 @@ import java.lang.annotation.*;
 @Documented
 @Component
 public @interface CustomAnnotation {
-
+    @AliasFor(annotation = Component.class, attribute = "value")
     String value() default "";
-
 }
