@@ -15,21 +15,21 @@ import java.util.Objects;
  */
 public class BeanDefinition implements Comparable<BeanDefinition> {
 
-    // 全局唯一的Bean Name:
+    // 全局唯一的Bean Name
     private final String name;
-    // Bean的声明类型:
+    // Bean的声明类型（类Bean的类型就是类本身，用工厂方法弄出来的Bean的类型是工厂方法的返回类型，但是实际上方法有可能返回这个类的子类）
     private final Class<?> beanClass;
-    // 构造方法/null:
+    // 构造方法，类Bean会有，工厂方法bean没有
     private final Constructor<?> constructor;
-    // 工厂方法名称/null:
+    // 工厂方法名称，工厂方法bean有，类bean没有
     private final String factoryName;
-    // 工厂方法/null:
+    // 工厂方法，工厂方法bean有，类bean没有
     private final Method factoryMethod;
-    // Bean的顺序:
+    // Bean的顺序，类bean和工厂方法bean都有
     private final int order;
-    // 是否标识@Primary:
+    // 是否标识@Primary，类bean和工厂方法bean都有
     private final boolean primary;
-    // Bean的实例:
+    // Bean的实例
     private Object instance = null;
     private String initMethodName;
     private String destroyMethodName;

@@ -55,6 +55,27 @@ public class AnnotationConfigApplicationContext {
         logger.atDebug().log("Scan packages in: {}", Arrays.toString(scanPackages));
 
         // 所有的要被框架管理的bean的包路径
+        Set<String> classNameSet = findAllClassFile(scanPackages);
+
+        // 处理Import注解，Import注解里加的类对象都要被框架管理
+        Import importAnno = ClassUtils.findAnnotation(configClass, Import.class);
+        if (importAnno != null) {
+            for (Class<?> importClass : importAnno.value()) {
+                classNameSet.add(importClass.getName());
+            }
+        }
+        return classNameSet;
+    }
+
+    /**
+     * 扫描指定包路径下的所有class文件
+     *
+     * @param scanPackages 包路径
+     * @return 所有class文件的包路径
+     * @throws URISyntaxException URL -> URI 转换错误
+     * @throws IOException        读取文件错误
+     */
+    private Set<String> findAllClassFile(String[] scanPackages) throws URISyntaxException, IOException {
         Set<String> classNameSet = new HashSet<>();
 
         for (String scanPackage : scanPackages) {
@@ -72,17 +93,14 @@ public class AnnotationConfigApplicationContext {
             });
             classNameSet.addAll(scanClasses);
         }
-
-        // 处理Import注解，Import注解里加的类对象都要被框架管理
-        Import importAnno = ClassUtils.findAnnotation(configClass, Import.class);
-        if (importAnno != null) {
-            for (Class<?> importClass : importAnno.value()) {
-                classNameSet.add(importClass.getName());
-            }
-        }
         return classNameSet;
     }
 
+    /**
+     * 创建Bean的定义
+     * @param beanClassNames Bean的类名集合，这里类名指的是"org.magicmarvel.handWriteSpring.annotation.AliasFor"这种很长很全的
+     * @return Bean的定义集合，每一个bean都会有一个独一无二的名字
+     */
     private Map<String, BeanDefinition> createBeanDefinitions(Set<String> beanClassNames) {
         Map<String, BeanDefinition> beans = new HashMap<>();
         for (String beanClassName : beanClassNames) {
@@ -143,22 +161,41 @@ public class AnnotationConfigApplicationContext {
         return beans;
     }
 
+    /**
+     * 获取方法的Order注解的值，没有就返回0，这个字段用于在Configuration类里对所有的方法创建bean时的顺序进行排序
+     * @param method 方法
+     * @return Order注解的值
+     */
     private int getOrder(Method method) {
         Order order = method.getAnnotation(Order.class);
         return order == null ? 0 : order.value();
     }
 
+    /**
+     * 判断一个类是否是Primary，当一个字段可以注入多个对象的时候（比如一个父类有好几个子类，挑选一个子类注入），Primary总是优先被注入
+     * @param clazz 类
+     * @return 是否是Primary
+     */
     private boolean isPrimary(Class<?> clazz) {
         return clazz.getAnnotation(Primary.class) != null;
     }
 
+    /**
+     * 获取类的Order注解的值，没有就返回0
+     * @param clazz 类
+     * @return Order注解的值
+     */
     private int getOrder(Class<?> clazz) {
         Order order = clazz.getAnnotation(Order.class);
         return order == null ? 0 : order.value();
     }
 
+    /**
+     * 获取一个类的构造方法，如果有多个构造方法，会优先选择标记了Primary的构造方法，如果没有标记Primary的构造方法，会抛出异常
+     * @param clazz 类
+     * @return 构造方法
+     */
     Constructor<?> getConstructor(Class<?> clazz) {
-
         Constructor<?>[] constructors = clazz.getConstructors();
         // 没有public的构造方法，就找所有的构造方法
         if (constructors.length == 0) {
@@ -192,10 +229,20 @@ public class AnnotationConfigApplicationContext {
         }
     }
 
+    /**
+     * 根据beanName获取Bean
+     * @param beanName Bean的名字
+     * @return Bean
+     */
     public BeanDefinition findBeanDefinition(String beanName) {
         return beans.get(beanName);
     }
 
+    /**
+     * 根据类获取Bean的List，所有满足条件的都会被找出来
+     * @param clazz 类
+     * @return Bean的List
+     */
     public List<BeanDefinition> findBeanDefinitions(Class<?> clazz) {
         return this.beans.values().stream()
                 // filter by type and sub-type:
@@ -204,6 +251,11 @@ public class AnnotationConfigApplicationContext {
                 .sorted().collect(Collectors.toList());
     }
 
+    /**
+     * 根据类获取Bean，如果有多个Bean，会优先选择Primary的Bean，如果没有Primary的Bean，会抛出异常
+     * @param clazz 类
+     * @return Bean
+     */
     public BeanDefinition findBeanDefinition(Class<?> clazz) {
         List<BeanDefinition> defs = findBeanDefinitions(clazz);
         if (defs.isEmpty()) {
