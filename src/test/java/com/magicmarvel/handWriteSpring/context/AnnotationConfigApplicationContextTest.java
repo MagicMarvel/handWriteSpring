@@ -7,9 +7,13 @@ import com.magicmarvel.imported.ZonedDateConfiguration;
 import com.magicmarvel.scan.ScanApplication;
 import com.magicmarvel.scan.custom.annotation.CustomAnnotationBean;
 import com.magicmarvel.scan.nested.OuterBean;
+import com.magicmarvel.scan.primary.DogBean;
 import com.magicmarvel.scan.primary.PersonBean;
 import com.magicmarvel.scan.primary.StudentBean;
 import com.magicmarvel.scan.primary.TeacherBean;
+import com.magicmarvel.scan.sub1.Sub1Bean;
+import com.magicmarvel.scan.sub1.sub2.Sub2Bean;
+import com.magicmarvel.scan.sub1.sub2.sub3.Sub3Bean;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -17,8 +21,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Properties;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.*;
 
 public class AnnotationConfigApplicationContextTest {
 
@@ -48,6 +51,47 @@ public class AnnotationConfigApplicationContextTest {
         // 1 @Primary PersonBean:
         BeanDefinition personPrimaryDef = ctx.findBeanDefinition(PersonBean.class);
         assertSame(teacherDef, personPrimaryDef);
+    }
+
+    @Test
+    public void testCustomAnnotation() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        assertNotNull(ctx.getBean(CustomAnnotationBean.class));
+        assertNotNull(ctx.getBean("customAnnotation"));
+    }
+
+    @Test
+    public void testImport() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        assertNotNull(ctx.getBean(LocalDateConfiguration.class));
+        assertNotNull(ctx.getBean("startLocalDate"));
+        assertNotNull(ctx.getBean("startLocalDateTime"));
+        assertNotNull(ctx.getBean(ZonedDateConfiguration.class));
+        assertNotNull(ctx.getBean("startZonedDateTime"));
+    }
+
+    @Test
+    public void testNested() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        ctx.getBean(OuterBean.class);
+        ctx.getBean(OuterBean.NestedBean.class);
+    }
+
+    @Test
+    public void testPrimary() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        var person = ctx.getBean(PersonBean.class);
+        assertEquals(TeacherBean.class, person.getClass());
+        var dog = ctx.getBean(DogBean.class);
+        assertEquals("Husky", dog.type);
+    }
+
+    @Test
+    public void testSub() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        ctx.getBean(Sub1Bean.class);
+        ctx.getBean(Sub2Bean.class);
+        ctx.getBean(Sub3Bean.class);
     }
 
     PropertyResolver createPropertyResolver() {

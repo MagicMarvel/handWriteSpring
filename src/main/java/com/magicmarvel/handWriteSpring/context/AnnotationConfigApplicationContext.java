@@ -98,6 +98,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 创建Bean的定义
+     *
      * @param beanClassNames Bean的类名集合，这里类名指的是"org.magicmarvel.handWriteSpring.annotation.AliasFor"这种很长很全的
      * @return Bean的定义集合，每一个bean都会有一个独一无二的名字
      */
@@ -163,6 +164,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 获取方法的Order注解的值，没有就返回0，这个字段用于在Configuration类里对所有的方法创建bean时的顺序进行排序
+     *
      * @param method 方法
      * @return Order注解的值
      */
@@ -173,6 +175,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 判断一个类是否是Primary，当一个字段可以注入多个对象的时候（比如一个父类有好几个子类，挑选一个子类注入），Primary总是优先被注入
+     *
      * @param clazz 类
      * @return 是否是Primary
      */
@@ -182,6 +185,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 获取类的Order注解的值，没有就返回0
+     *
      * @param clazz 类
      * @return Order注解的值
      */
@@ -192,6 +196,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 获取一个类的构造方法，如果有多个构造方法，会优先选择标记了Primary的构造方法，如果没有标记Primary的构造方法，会抛出异常
+     *
      * @param clazz 类
      * @return 构造方法
      */
@@ -231,6 +236,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 根据beanName获取Bean
+     *
      * @param beanName Bean的名字
      * @return Bean
      */
@@ -240,6 +246,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 根据类获取Bean的List，所有满足条件的都会被找出来
+     *
      * @param clazz 类
      * @return Bean的List
      */
@@ -253,6 +260,7 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 根据类获取Bean，如果有多个Bean，会优先选择Primary的Bean，如果没有Primary的Bean，会抛出异常
+     *
      * @param clazz 类
      * @return Bean
      */
@@ -272,5 +280,13 @@ public class AnnotationConfigApplicationContext {
             throw new BeanDefinitionException("No primary bean found for class: " + clazz.getName());
         }
         return list.getFirst();
+    }
+
+    public <T> T getBean(Class<T> clazz) {
+        return null;
+    }
+
+    public Object getBean(String className) {
+        return null;
     }
 }
