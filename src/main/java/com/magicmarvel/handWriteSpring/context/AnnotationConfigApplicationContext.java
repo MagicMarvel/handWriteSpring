@@ -1,18 +1,20 @@
 package com.magicmarvel.handWriteSpring.context;
 
 import com.magicmarvel.handWriteSpring.annotation.*;
+import com.magicmarvel.handWriteSpring.exception.BeanCreationException;
 import com.magicmarvel.handWriteSpring.exception.BeanDefinitionException;
+import com.magicmarvel.handWriteSpring.exception.UnsatisfiedDependencyException;
 import com.magicmarvel.handWriteSpring.io.property.PropertyResolver;
 import com.magicmarvel.handWriteSpring.io.resource.ResourceResolver;
 import com.magicmarvel.handWriteSpring.utils.ClassUtils;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,6 +25,8 @@ public class AnnotationConfigApplicationContext {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final PropertyResolver propertyResolver;
     private Map<String, BeanDefinition> beans = new HashMap<>();
+    Set<String> creatingBeanNames = new HashSet<>();
+
 
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException {
         this.propertyResolver = propertyResolver;
@@ -33,6 +37,81 @@ public class AnnotationConfigApplicationContext {
         // 创建Bean的定义:
         this.beans = createBeanDefinitions(beanClassNames);
 
+        // 实例化beans
+        this.beans = createBeanInstances(this.beans);
+
+    }
+
+    private Map<String, BeanDefinition> createBeanInstances(Map<String, BeanDefinition> beans) {
+        // 1. 把所有的Configuration拿出来先实例化他们，不然他们的工厂方法bean没法实例化
+        beans.values().stream().filter(
+                bean -> bean.getBeanClass().isAnnotationPresent(Configuration.class)
+        ).sorted().forEach(bean -> {
+            try {
+                Object instance = createBeanAsEarlySingleton(bean);
+                bean.setInstance(instance);
+                logger.atDebug().log("Create Configurator's @Bean {} instance: {}", bean.getName(), instance);
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(bean -> {
+            try {
+                Object instance = createBeanAsEarlySingleton(bean);
+                bean.setInstance(instance);
+                logger.atDebug().log("Create @Component {} instance: {}", bean.getName(), instance);
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        return beans;
+    }
+
+    private Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
+        if (this.creatingBeanNames.contains(bean.getName())) {
+            throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
+        }
+
+        Executable createFn = bean.getFactoryName() == null ?
+                bean.getConstructor() : bean.getFactoryMethod();
+        if (createFn == null) {
+            throw new BeanCreationException("Cannot create " + bean.getName() + " instance cause it doesn't have constructor or factory method");
+        }
+
+
+        Object[] params = new Object[createFn.getParameterCount()];
+        Parameter[] parameters = createFn.getParameters();
+        for (int i = 0, parametersLength = parameters.length; i < parametersLength; i++) {
+            Parameter parameter = parameters[i];
+            if (parameter.isAnnotationPresent(Autowired.class)) {
+                Class<?> type = parameter.getType();
+                BeanDefinition refBean = findBeanDefinition(type);
+                if (refBean == null) {
+                    throw new UnsatisfiedDependencyException("No bean found for type: " + type.getName());
+                }
+                Object refInstance = refBean.getInstance();
+                if (refInstance == null) {
+                    refInstance = createBeanAsEarlySingleton(refBean);
+                    refBean.setInstance(refInstance);
+                }
+                params[i] = refInstance;
+            }
+            if (parameter.isAnnotationPresent(Value.class)) {
+                Value value = parameter.getAnnotation(Value.class);
+                params[i] = propertyResolver.getProperty(value.value(), parameter.getType());
+            }
+        }
+
+        if (bean.getConstructor() != null) {
+            return bean.getConstructor().newInstance(params);
+        }
+
+        if (bean.getFactoryMethod() != null) {
+            Object originBean = this.getBean(bean.getFactoryMethod().getDeclaringClass());
+            return bean.getFactoryMethod().invoke(originBean, params);
+        }
+        return null;
     }
 
     /**
@@ -114,9 +193,6 @@ public class AnnotationConfigApplicationContext {
                         !beanClass.isEnum() &&
                         !beanClass.isPrimitive()
                 ) {
-                    if (Objects.equals(beanClassName, "com.magicmarvel.imported.ZonedDateConfiguration")) {
-                        System.out.println("aaa");
-                    }
                     String beanName = ClassUtils.getBeanName(beanClass);
                     BeanDefinition beanDefinition = new BeanDefinition(beanName,
                             beanClass,
@@ -136,7 +212,6 @@ public class AnnotationConfigApplicationContext {
                         for (Method method : beanClass.getDeclaredMethods()) {
                             if (method.isAnnotationPresent(Bean.class)) {
                                 String methodName = ClassUtils.getBeanName(method);
-                                System.out.println(methodName);
                                 Bean bean = method.getAnnotation(Bean.class);
                                 BeanDefinition methodBeanDefinition = new BeanDefinition(
                                         methodName,
@@ -264,7 +339,7 @@ public class AnnotationConfigApplicationContext {
      * @param clazz 类
      * @return Bean
      */
-    public BeanDefinition findBeanDefinition(Class<?> clazz) {
+    public @Nullable BeanDefinition findBeanDefinition(Class<?> clazz) {
         List<BeanDefinition> defs = findBeanDefinitions(clazz);
         if (defs.isEmpty()) {
             return null;
@@ -282,11 +357,11 @@ public class AnnotationConfigApplicationContext {
         return list.getFirst();
     }
 
-    public <T> T getBean(Class<T> clazz) {
-        return null;
+    public Object getBean(Class<?> clazz) {
+        return findBeanDefinition(clazz).getInstance();
     }
 
     public Object getBean(String className) {
-        return null;
+        return findBeanDefinition(className).getInstance();
     }
 }
