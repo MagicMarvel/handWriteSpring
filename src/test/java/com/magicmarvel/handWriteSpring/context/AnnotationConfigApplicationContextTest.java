@@ -5,7 +5,10 @@ import com.magicmarvel.handWriteSpring.io.property.PropertyResolver;
 import com.magicmarvel.imported.LocalDateConfiguration;
 import com.magicmarvel.imported.ZonedDateConfiguration;
 import com.magicmarvel.scan.ScanApplication;
+import com.magicmarvel.scan.convert.ValueConverterBean;
 import com.magicmarvel.scan.custom.annotation.CustomAnnotationBean;
+import com.magicmarvel.scan.init.AnnotationInitBean;
+import com.magicmarvel.scan.init.SpecifyInitBean;
 import com.magicmarvel.scan.nested.OuterBean;
 import com.magicmarvel.scan.primary.DogBean;
 import com.magicmarvel.scan.primary.PersonBean;
@@ -18,10 +21,12 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.time.*;
 import java.util.List;
 import java.util.Properties;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertSame;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AnnotationConfigApplicationContextTest {
 
@@ -93,6 +98,58 @@ public class AnnotationConfigApplicationContextTest {
         ctx.getBean(Sub2Bean.class);
         ctx.getBean(Sub3Bean.class);
     }
+
+    @Test
+    public void testInitMethod() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        // test @PostConstruct:
+        var bean1 = ctx.getBean(AnnotationInitBean.class);
+        var bean2 = ctx.getBean(SpecifyInitBean.class);
+        assertEquals("Scan App / v1.0", bean1.appName);
+        assertEquals("Scan App / v1.0", bean2.appName);
+    }
+
+    @Test
+    public void testConverter() throws URISyntaxException, IOException {
+        var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
+        var bean = ctx.getBean(ValueConverterBean.class);
+
+        assertNotNull(bean.injectedBoolean);
+        assertTrue(bean.injectedBooleanPrimitive);
+        assertTrue(bean.injectedBoolean);
+
+        assertNotNull(bean.injectedByte);
+        assertEquals((byte) 123, bean.injectedByte);
+        assertEquals((byte) 123, bean.injectedBytePrimitive);
+
+        assertNotNull(bean.injectedShort);
+        assertEquals((short) 12345, bean.injectedShort);
+        assertEquals((short) 12345, bean.injectedShortPrimitive);
+
+        assertNotNull(bean.injectedInteger);
+        assertEquals(1234567, bean.injectedInteger);
+        assertEquals(1234567, bean.injectedIntPrimitive);
+
+        assertNotNull(bean.injectedLong);
+        assertEquals(123456789_000L, bean.injectedLong);
+        assertEquals(123456789_000L, bean.injectedLongPrimitive);
+
+        assertNotNull(bean.injectedFloat);
+        assertEquals(12345.6789F, bean.injectedFloat, 0.0001F);
+        assertEquals(12345.6789F, bean.injectedFloatPrimitive, 0.0001F);
+
+        assertNotNull(bean.injectedDouble);
+        assertEquals(123456789.87654321, bean.injectedDouble, 0.0000001);
+        assertEquals(123456789.87654321, bean.injectedDoublePrimitive, 0.0000001);
+
+        assertEquals(LocalDate.parse("2023-03-29"), bean.injectedLocalDate);
+        assertEquals(LocalTime.parse("20:45:01"), bean.injectedLocalTime);
+        assertEquals(LocalDateTime.parse("2023-03-29T20:45:01"), bean.injectedLocalDateTime);
+        assertEquals(ZonedDateTime.parse("2023-03-29T20:45:01+08:00[Asia/Shanghai]"), bean.injectedZonedDateTime);
+        assertEquals(Duration.parse("P2DT3H4M"), bean.injectedDuration);
+        assertEquals(ZoneId.of("Asia/Shanghai"), bean.injectedZoneId);
+    }
+
 
     PropertyResolver createPropertyResolver() {
         var ps = new Properties();

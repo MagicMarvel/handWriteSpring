@@ -34,12 +34,10 @@ public class AnnotationConfigApplicationContext {
         // 扫描获取所有Bean的Class类型:
         final Set<String> beanClassNames = scanForClassNames(configClass);
 
-        // 创建Bean的定义:
-        this.beans = createBeanDefinitions(beanClassNames);
-
         // 实例化beans
-        this.beans = createBeanInstances(this.beans);
+        this.beans = createBeanInstances(createBeanDefinitions(beanClassNames));
 
+        injectBeans(beans);
     }
 
     private Map<String, BeanDefinition> createBeanInstances(Map<String, BeanDefinition> beans) {
@@ -56,6 +54,7 @@ public class AnnotationConfigApplicationContext {
             }
         });
 
+        // 把所有的bean都实例化出来
         beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(bean -> {
             try {
                 Object instance = createBeanAsEarlySingleton(bean);
@@ -63,6 +62,38 @@ public class AnnotationConfigApplicationContext {
                 logger.atDebug().log("Create @Component {} instance: {}", bean.getName(), instance);
             } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException(e);
+            }
+        });
+
+        // 把字段注入进去
+        beans.values().forEach(bean -> {
+            Field[] fields = bean.getBeanClass().getDeclaredFields();
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(Autowired.class)) {
+                    Class<?> type = field.getType();
+                    BeanDefinition refBean = findBeanDefinition(type);
+                    if (refBean == null) {
+                        throw new UnsatisfiedDependencyException("No bean found for type: " + type.getName());
+                    }
+                    if (refBean.getInstance() == null) {
+                        throw new UnsatisfiedDependencyException("No bean instance found for type: " + type.getName());
+                    }
+                    try {
+                        field.setAccessible(true);
+                        field.set(bean.getInstance(), refBean.getInstance());
+                    } catch (IllegalAccessException e) {
+                        throw new BeanCreationException("Cannot inject field: " + field.getName(), e);
+                    }
+                }
+                if (field.isAnnotationPresent(Value.class)) {
+                    Value value = field.getAnnotation(Value.class);
+                    try {
+                        field.setAccessible(true);
+                        field.set(bean.getInstance(), propertyResolver.getProperty(value.value(), field.getType()));
+                    } catch (IllegalAccessException e) {
+                        throw new BeanCreationException("Cannot inject field: " + field.getName(), e);
+                    }
+                }
             }
         });
         return beans;
@@ -357,8 +388,8 @@ public class AnnotationConfigApplicationContext {
         return list.getFirst();
     }
 
-    public Object getBean(Class<?> clazz) {
-        return findBeanDefinition(clazz).getInstance();
+    public <T> T getBean(Class<T> clazz) {
+        return (T) Objects.requireNonNull(findBeanDefinition(clazz)).getInstance();
     }
 
     public Object getBean(String className) {
