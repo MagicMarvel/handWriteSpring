@@ -21,7 +21,7 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
     private final Class<?> beanClass;
     // 构造方法，类Bean会有，工厂方法bean没有
     private final Constructor<?> constructor;
-    //     工厂方法名称，工厂方法bean有，类bean没有
+    // 工厂方法名称，工厂方法bean有，类bean没有
     private final String factoryName;
     // 工厂方法，工厂方法bean有，类bean没有
     private final Method factoryMethod;
