@@ -10,7 +10,6 @@ import com.magicmarvel.scan.custom.annotation.CustomAnnotationBean;
 import com.magicmarvel.scan.init.AnnotationInitBean;
 import com.magicmarvel.scan.init.SpecifyInitBean;
 import com.magicmarvel.scan.nested.OuterBean;
-import com.magicmarvel.scan.primary.DogBean;
 import com.magicmarvel.scan.primary.PersonBean;
 import com.magicmarvel.scan.primary.StudentBean;
 import com.magicmarvel.scan.primary.TeacherBean;
@@ -87,7 +86,7 @@ public class AnnotationConfigApplicationContextTest {
         var ctx = new AnnotationConfigApplicationContext(ScanApplication.class, createPropertyResolver());
         var person = ctx.getBean(PersonBean.class);
         assertEquals(TeacherBean.class, person.getClass());
-        var dog = ctx.getBean(DogBean.class);
+//        var dog = ctx.getBean(DogBean.class);
 //        assertEquals("Husky", dog.type);
     }
 

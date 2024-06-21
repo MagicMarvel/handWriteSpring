@@ -4,6 +4,7 @@ import com.magicmarvel.handWriteSpring.annotation.AliasFor;
 import com.magicmarvel.handWriteSpring.annotation.Bean;
 import com.magicmarvel.handWriteSpring.annotation.Component;
 import com.magicmarvel.handWriteSpring.exception.BeanDefinitionException;
+import jakarta.annotation.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
@@ -86,9 +87,17 @@ public class ClassUtils {
     }
 
 
-    public static <T extends Annotation> Method findAnnotationMethod(Class<?> clazz, Class<T> annoClass) {
+    /**
+     * 找出clazz里标注了annoClass的方法
+     *
+     * @param clazz     类
+     * @param annoClass 需要被寻找到的注解
+     * @param <T>       注解类型
+     * @return 标注了给定注解的方法
+     */
+    public static <T extends Annotation> @Nullable Method findAnnotationMethod(Class<?> clazz, Class<T> annoClass) {
         Method found = null;
-        for (Method method : clazz.getMethods()) {
+        for (Method method : clazz.getDeclaredMethods()) {
             if (found == null) {
                 if (method.getAnnotation(annoClass) != null) {
                     found = method;
@@ -102,6 +111,11 @@ public class ClassUtils {
         return found;
     }
 
+    /**
+     * 获取Bean的名称，这里传入的method一定是有Bean的method
+     *
+     * @param method Bean的Method
+     */
     public static String getBeanName(Method method) {
         Bean bean = method.getAnnotation(Bean.class);
         return bean.value().isEmpty() ? method.getName() : bean.value();
