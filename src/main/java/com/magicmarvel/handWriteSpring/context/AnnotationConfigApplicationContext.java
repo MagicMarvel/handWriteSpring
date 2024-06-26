@@ -25,6 +25,7 @@ public class AnnotationConfigApplicationContext {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final PropertyResolver propertyResolver;
     private final Map<String, BeanDefinition> beans = new HashMap<>();
+    private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
     Set<String> creatingBeanNames = new HashSet<>();
 
 
@@ -62,7 +63,7 @@ public class AnnotationConfigApplicationContext {
     private void injectBeans() {
         for (BeanDefinition def : beans.values()) {
             if (def.getInstance() != null) {
-                injectBean(def.getInstance(), def.getBeanClass());
+                injectBean(def.getOriginInstance(), def.getBeanClass());
             } else {
                 throw new BeanCreationException("Bean instance not found: " + def.getName());
             }
@@ -77,6 +78,7 @@ public class AnnotationConfigApplicationContext {
      * @param needScanClass 需要扫描的类
      */
     private void injectBean(Object nowInstance, Class<?> needScanClass) {
+        // 处理字段注入
         for (Field field : needScanClass.getDeclaredFields()) {
             // 处理一个类的字段AutoWired注入
             if (field.isAnnotationPresent(Autowired.class)) {
@@ -108,6 +110,21 @@ public class AnnotationConfigApplicationContext {
                 }
             }
         }
+
+        // 处理setter函数注入
+        for (Method method : needScanClass.getDeclaredMethods()) {
+            if (method.getReturnType() == void.class && method.getParameters().length == 1
+                    && method.getName().startsWith("set") && method.isAnnotationPresent(Value.class)) {
+                String param = propertyResolver.getProperty(method.getAnnotation(Value.class).value());
+                try {
+                    method.invoke(nowInstance, param);
+                } catch (IllegalAccessException | InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+
         if (needScanClass.getSuperclass() != Object.class) {
             injectBean(nowInstance, needScanClass.getSuperclass());
         }
@@ -118,41 +135,43 @@ public class AnnotationConfigApplicationContext {
      */
     private void createBeanInstances() {
         // 1. 把所有的Configuration拿出来先实例化他们，不然他们的工厂方法bean没法实例化
-        beans.values().stream().filter(
-                bean -> bean.getBeanClass().isAnnotationPresent(Configuration.class)
-        ).sorted().forEach(bean -> {
+        beans.values().stream().filter(BeanDefinition::isConfigurator).sorted().forEach(bean -> {
             try {
-                Object instance = createBeanAsEarlySingleton(bean);
-                bean.setInstance(instance);
-                logger.atDebug().log("Create Configurator's @Bean {} instance: {}", bean.getName(), instance);
+                createBeanAsEarlySingleton(bean);
             } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException(e);
             }
         });
 
-        // 把所有的bean都实例化出来
+        // 2. 创建所有BeanPostProcessor
+        beans.values().stream().filter(BeanDefinition::isBeanPostProcessor).sorted().forEach(bean -> {
+            try {
+                createBeanAsEarlySingleton(bean);
+                beanPostProcessors.add((BeanPostProcessor) bean.getInstance());
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // 3. 把所有的bean都实例化出来
         beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(bean -> {
             try {
-                Object instance = createBeanAsEarlySingleton(bean);
-                bean.setInstance(instance);
-                logger.atDebug().log("Create @Component {} instance: {}", bean.getName(), instance);
+                createBeanAsEarlySingleton(bean);
             } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException(e);
             }
         });
-
     }
 
     /**
      * 创建Bean的实例，如果有循环依赖，会抛出异常
      *
      * @param bean Bean的定义
-     * @return Bean的实例
      * @throws InvocationTargetException 构造方法实例化对象抛出异常
      * @throws InstantiationException    构造函数或者工厂函数调用出错
      * @throws IllegalAccessException    无法访问构造函数或者工厂方法
      */
-    private Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
+    private void createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
         if (this.creatingBeanNames.contains(bean.getName())) {
             throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
         }
@@ -168,7 +187,8 @@ public class AnnotationConfigApplicationContext {
         Parameter[] parameters = createFn.getParameters();
         for (int i = 0, parametersLength = parameters.length; i < parametersLength; i++) {
             Parameter parameter = parameters[i];
-            if (parameter.isAnnotationPresent(Autowired.class)) {
+            // 在工厂方法返回一个Bean的时候，工厂方法的入参不需要AutoWired注解，Spring也应该找对应的注解注入进去
+            if (parameter.isAnnotationPresent(Autowired.class) || parameter.getAnnotations().length == 0) {
                 Class<?> type = parameter.getType();
                 BeanDefinition refBean = findBeanDefinition(type);
                 if (refBean == null) {
@@ -176,8 +196,8 @@ public class AnnotationConfigApplicationContext {
                 }
                 Object refInstance = refBean.getInstance();
                 if (refInstance == null) {
-                    refInstance = createBeanAsEarlySingleton(refBean);
-                    refBean.setInstance(refInstance);
+                    createBeanAsEarlySingleton(refBean);
+                    refBean.setInstance(refBean.getInstance());
                 }
                 params[i] = refInstance;
             }
@@ -187,19 +207,27 @@ public class AnnotationConfigApplicationContext {
             }
         }
 
+        Object instance = null;
         if (bean.getConstructor() != null) {
             Constructor<?> constructor = bean.getConstructor();
             constructor.setAccessible(true);
-            return constructor.newInstance(params);
+            instance = constructor.newInstance(params);
         }
 
         if (bean.getFactoryMethod() != null) {
             Object originBean = this.getBean(bean.getFactoryMethod().getDeclaringClass());
             Method factoryMethod = bean.getFactoryMethod();
             factoryMethod.setAccessible(true);
-            return factoryMethod.invoke(originBean, params);
+            instance = factoryMethod.invoke(originBean, params);
         }
-        return null;
+
+        bean.setOriginInstance(instance);
+
+        // 调用BeanPostProcessor处理Bean:
+        for (BeanPostProcessor processor : beanPostProcessors) {
+            instance = processor.postProcessBeforeInitialization(instance, bean.getName());
+        }
+        bean.setInstance(instance);
     }
 
     /**
@@ -457,7 +485,8 @@ public class AnnotationConfigApplicationContext {
     }
 
     public <T> T getBean(Class<T> clazz) {
-        return (T) Objects.requireNonNull(findBeanDefinition(clazz)).getInstance();
+        Object instance = Objects.requireNonNull(findBeanDefinition(clazz)).getInstance();
+        return clazz.cast(instance);  // 使用 Class.cast() 来进行类型转换
     }
 
     public Object getBean(String className) {

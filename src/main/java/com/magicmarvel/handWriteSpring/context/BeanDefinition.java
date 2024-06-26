@@ -1,5 +1,6 @@
 package com.magicmarvel.handWriteSpring.context;
 
+import com.magicmarvel.handWriteSpring.annotation.Configuration;
 import com.magicmarvel.handWriteSpring.exception.BeanCreationException;
 import jakarta.annotation.Nullable;
 
@@ -29,8 +30,10 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
     private final int order;
     // 是否标识@Primary，类bean和工厂方法bean都有
     private final boolean primary;
-    // Bean的实例
+    // Bean的实例（如果这个bean被使用BeanPostProcessor替换了，则这里存放被替换成的bean）
     private Object instance = null;
+    // Bean的原始实例（如果这个bean被使用BeanPostProcessor替换了，则这里存放原始的bean）
+    private Object originInstance = null;
     private String initMethodName;
     private String destroyMethodName;
 
@@ -126,6 +129,11 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
         return this.instance;
     }
 
+    @Nullable
+    public Object getOriginInstance() {
+        return this.originInstance;
+    }
+
     public void setInstance(Object instance) {
         Objects.requireNonNull(instance, "Bean instance is null.");
         if (!this.beanClass.isAssignableFrom(instance.getClass())) {
@@ -134,6 +142,16 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
         }
         this.instance = instance;
     }
+
+    public void setOriginInstance(Object originInstance) {
+        Objects.requireNonNull(originInstance, "Bean originInstance is null.");
+        if (!this.beanClass.isAssignableFrom(originInstance.getClass())) {
+            throw new BeanCreationException(String.format("OriginInstance '%s' of Bean '%s' is not the expected type: %s", originInstance, originInstance.getClass().getName(),
+                    this.beanClass.getName()));
+        }
+        this.originInstance = originInstance;
+    }
+
 
     public Object getRequiredInstance() {
         if (this.instance == null) {
@@ -160,6 +178,14 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
             return this.factoryMethod.getDeclaringClass().getSimpleName() + "." + this.factoryMethod.getName() + "(" + params + ")";
         }
         return null;
+    }
+
+    public boolean isConfigurator() {
+        return this.getBeanClass().isAnnotationPresent(Configuration.class);
+    }
+
+    public boolean isBeanPostProcessor() {
+        return BeanPostProcessor.class.isAssignableFrom(this.getBeanClass());
     }
 
     @Override
