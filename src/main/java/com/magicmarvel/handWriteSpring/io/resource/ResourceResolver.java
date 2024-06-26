@@ -67,7 +67,7 @@ public class ResourceResolver {
                     resource = new Resource("file:" + file.toString(),
                             file.toString().substring(basePath.length() - 5));
                 }
-                logger.atDebug().log("find resource: {}", resource);
+                logger.atDebug().log("Find resource: {}", resource);
                 T apply = mapper.apply(resource);
                 if (apply != null) {
                     reply.add(apply);

@@ -27,14 +27,4 @@ public class SecondProxyBeanPostProcessor implements BeanPostProcessor {
         }
         return bean;
     }
-
-    @Override
-    public Object postProcessOnSetProperty(Object bean, String beanName) {
-        Object origin = originBeans.get(beanName);
-        if (origin != null) {
-            logger.debug("auto set property for {} from second proxy {} to origin bean: {}", beanName, bean, origin);
-            return origin;
-        }
-        return bean;
-    }
 }

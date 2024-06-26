@@ -16,10 +16,4 @@ public interface BeanPostProcessor {
         return bean;
     }
 
-    /**
-     * Invoked before bean.setXyz() called.
-     */
-    default Object postProcessOnSetProperty(Object bean, String beanName) {
-        return bean;
-    }
 }
