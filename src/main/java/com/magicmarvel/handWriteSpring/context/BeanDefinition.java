@@ -34,9 +34,11 @@ public class BeanDefinition implements Comparable<BeanDefinition> {
     private Object instance = null;
     // Bean的原始实例（如果这个bean被使用BeanPostProcessor替换了，则这里存放原始的bean）
     private Object originInstance = null;
+
+    // init and destroy method come from @Bean annotation
+    // or come from @PostConstruct and @PreDestroy annotation in @Component
     private String initMethodName;
     private String destroyMethodName;
-
     private Method initMethod;
     private Method destroyMethod;
 

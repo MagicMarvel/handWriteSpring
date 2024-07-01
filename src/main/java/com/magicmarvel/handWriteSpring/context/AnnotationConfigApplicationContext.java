@@ -1,9 +1,7 @@
 package com.magicmarvel.handWriteSpring.context;
 
 import com.magicmarvel.handWriteSpring.annotation.*;
-import com.magicmarvel.handWriteSpring.exception.BeanCreationException;
-import com.magicmarvel.handWriteSpring.exception.BeanDefinitionException;
-import com.magicmarvel.handWriteSpring.exception.UnsatisfiedDependencyException;
+import com.magicmarvel.handWriteSpring.exception.*;
 import com.magicmarvel.handWriteSpring.io.property.PropertyResolver;
 import com.magicmarvel.handWriteSpring.io.resource.ResourceResolver;
 import com.magicmarvel.handWriteSpring.utils.ClassUtils;
@@ -20,7 +18,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-public class AnnotationConfigApplicationContext {
+public class AnnotationConfigApplicationContext implements ConfigurableApplicationContext {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final PropertyResolver propertyResolver;
@@ -30,6 +28,9 @@ public class AnnotationConfigApplicationContext {
 
 
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException {
+
+        ApplicationContextUtils.setApplicationContext(this);
+
         this.propertyResolver = propertyResolver;
 
         // 扫描获取所有Bean的Class类型:
@@ -165,13 +166,17 @@ public class AnnotationConfigApplicationContext {
 
     /**
      * 创建Bean的实例，如果有循环依赖，会抛出异常
+     * 最终的实例会直接放到BeanDefinition里，也会直接返回出来
+     * 代理前的实例（和BeanPostProcessor有关那种）会放在BeanDefinition的originInstance里
      *
      * @param bean Bean的定义
+     * @return Bean的实例
      * @throws InvocationTargetException 构造方法实例化对象抛出异常
      * @throws InstantiationException    构造函数或者工厂函数调用出错
      * @throws IllegalAccessException    无法访问构造函数或者工厂方法
      */
-    private void createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
+    @Override
+    public Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
         if (this.creatingBeanNames.contains(bean.getName())) {
             throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
         }
@@ -188,18 +193,18 @@ public class AnnotationConfigApplicationContext {
         for (int i = 0, parametersLength = parameters.length; i < parametersLength; i++) {
             Parameter parameter = parameters[i];
             // 在工厂方法返回一个Bean的时候，工厂方法的入参不需要AutoWired注解，Spring也应该找对应的注解注入进去
+            // 构造函数创建Bean的时候，也是适用的，不需要入参有AutoWired就能注入
             if (parameter.isAnnotationPresent(Autowired.class) || parameter.getAnnotations().length == 0) {
                 Class<?> type = parameter.getType();
-                BeanDefinition refBean = findBeanDefinition(type);
-                if (refBean == null) {
+                BeanDefinition paramBean = findBeanDefinition(type);
+                if (paramBean == null) {
                     throw new UnsatisfiedDependencyException("No bean found for type: " + type.getName());
                 }
-                Object refInstance = refBean.getInstance();
-                if (refInstance == null) {
-                    createBeanAsEarlySingleton(refBean);
-                    refBean.setInstance(refBean.getInstance());
+                Object paramBeanInstance = paramBean.getInstance();
+                if (paramBeanInstance == null) {
+                    paramBeanInstance = createBeanAsEarlySingleton(paramBean);
                 }
-                params[i] = refInstance;
+                params[i] = paramBeanInstance;
             }
             if (parameter.isAnnotationPresent(Value.class)) {
                 Value value = parameter.getAnnotation(Value.class);
@@ -228,6 +233,7 @@ public class AnnotationConfigApplicationContext {
             instance = processor.postProcessBeforeInitialization(instance, bean.getName());
         }
         bean.setInstance(instance);
+        return bean.getInstance();
     }
 
     /**
@@ -442,8 +448,25 @@ public class AnnotationConfigApplicationContext {
      * @param beanName Bean的名字
      * @return Bean
      */
+    @Nullable
+    @Override
     public BeanDefinition findBeanDefinition(String beanName) {
         return beans.get(beanName);
+    }
+
+    @Nullable
+    @Override
+    public BeanDefinition findBeanDefinition(String name, Class<?> requiredType) {
+        BeanDefinition def = findBeanDefinition(name);
+        if (def == null) {
+            return null;
+        }
+        if (!requiredType.isAssignableFrom(def.getBeanClass())) {
+            throw new BeanNotOfRequiredTypeException(
+                    String.format("Autowire required type '%s' but bean '%s' has actual type '%s'.", requiredType.getName(),
+                            name, def.getBeanClass().getName()));
+        }
+        return null;
     }
 
     /**
@@ -452,7 +475,8 @@ public class AnnotationConfigApplicationContext {
      * @param clazz 类
      * @return Bean的List
      */
-    public <T> List<BeanDefinition> findBeanDefinitions(Class<T> clazz) {
+    @Override
+    public List<BeanDefinition> findBeanDefinitions(Class<?> clazz) {
         return this.beans.values().stream()
                 .filter(def ->
                         clazz.isAssignableFrom(def.getBeanClass())
@@ -466,7 +490,8 @@ public class AnnotationConfigApplicationContext {
      * @param clazz 类
      * @return Bean
      */
-    public <T> @Nullable BeanDefinition findBeanDefinition(Class<T> clazz) {
+    @Override
+    public @Nullable BeanDefinition findBeanDefinition(Class<?> clazz) {
         List<BeanDefinition> defs = findBeanDefinitions(clazz);
         if (defs.isEmpty()) {
             return null;
@@ -484,12 +509,59 @@ public class AnnotationConfigApplicationContext {
         return list.getFirst();
     }
 
+    @Override
+    public boolean containsBean(String name) {
+        return beans.containsKey(name);
+    }
+
+    @Override
+    public <T> T getBean(String name, Class<T> requiredType) {
+        BeanDefinition def = findBeanDefinition(name, requiredType);
+        if (def != null) {
+            return requiredType.cast(def.getInstance());
+        } else {
+            return null;
+        }
+    }
+
     public <T> T getBean(Class<T> clazz) {
         Object instance = Objects.requireNonNull(findBeanDefinition(clazz)).getInstance();
         return clazz.cast(instance);  // 使用 Class.cast() 来进行类型转换
     }
 
-    public Object getBean(String className) {
-        return findBeanDefinition(className).getInstance();
+    @Override
+    public <T> List<T> getBeans(Class<T> requiredType) {
+        List<BeanDefinition> defs = findBeanDefinitions(requiredType);
+        if (!defs.isEmpty()) {
+            return defs.stream().map(def -> requiredType.cast(def.getInstance())).collect(Collectors.toList());
+        }
+        return List.of();
+    }
+
+    @Override
+    public void close() {
+        logger.info("Closing {}...", this.getClass().getName());
+        this.beans.values().forEach(def -> {
+            final Object beanInstance = def.getInstance();
+            if (def.getDestroyMethod() != null) {
+                try {
+                    def.getDestroyMethod().invoke(beanInstance);
+                } catch (IllegalAccessException | InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+        });
+        this.beans.clear();
+        logger.info("{} closed.", this.getClass().getName());
+        ApplicationContextUtils.setApplicationContext(null);
+    }
+
+    public <T> T getBean(String className) {
+        BeanDefinition beanDefinition = findBeanDefinition(className);
+        if (beanDefinition == null) {
+            throw new NoSuchBeanDefinitionException("No bean found for name: " + className);
+        }
+        return (T) beanDefinition.getInstance();
     }
 }
