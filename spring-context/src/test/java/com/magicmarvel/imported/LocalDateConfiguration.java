@@ -1,8 +1,8 @@
 package com.magicmarvel.imported;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Bean;
-import org.magicmarvel.handWriteSpring.annotation.Configuration;
+import org.magicmarvel.spring.context.annotation.Bean;
+import org.magicmarvel.spring.context.annotation.Configuration;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

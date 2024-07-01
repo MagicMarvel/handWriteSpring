@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.proxy;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Autowired;
-import org.magicmarvel.handWriteSpring.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Autowired;
+import org.magicmarvel.spring.context.annotation.Component;
 
 @Component
 public class InjectProxyOnPropertyBean {

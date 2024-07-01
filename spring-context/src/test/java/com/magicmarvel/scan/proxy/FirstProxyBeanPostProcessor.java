@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.proxy;
 
-import org.magicmarvel.handWriteSpring.annotation.Component;
-import org.magicmarvel.handWriteSpring.annotation.Order;
-import org.magicmarvel.handWriteSpring.context.BeanPostProcessor;
+import org.magicmarvel.spring.context.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Order;
+import org.magicmarvel.spring.context.context.BeanPostProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

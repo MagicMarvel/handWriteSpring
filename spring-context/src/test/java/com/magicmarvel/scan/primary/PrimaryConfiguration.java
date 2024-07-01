@@ -1,9 +1,9 @@
 package com.magicmarvel.scan.primary;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Bean;
-import org.magicmarvel.handWriteSpring.annotation.Configuration;
-import org.magicmarvel.handWriteSpring.annotation.Primary;
+import org.magicmarvel.spring.context.annotation.Bean;
+import org.magicmarvel.spring.context.annotation.Configuration;
+import org.magicmarvel.spring.context.annotation.Primary;
 
 @Configuration
 public class PrimaryConfiguration {

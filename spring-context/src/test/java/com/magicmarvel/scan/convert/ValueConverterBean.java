@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.convert;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Component;
-import org.magicmarvel.handWriteSpring.annotation.Value;
+import org.magicmarvel.spring.context.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Value;
 
 import java.time.*;
 

@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.proxy;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Component;
-import org.magicmarvel.handWriteSpring.annotation.Value;
+import org.magicmarvel.spring.context.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Value;
 
 @Component
 public class OriginBean {

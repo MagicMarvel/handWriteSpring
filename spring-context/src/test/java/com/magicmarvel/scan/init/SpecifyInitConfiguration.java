@@ -1,9 +1,9 @@
 package com.magicmarvel.scan.init;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Bean;
-import org.magicmarvel.handWriteSpring.annotation.Configuration;
-import org.magicmarvel.handWriteSpring.annotation.Value;
+import org.magicmarvel.spring.context.annotation.Bean;
+import org.magicmarvel.spring.context.annotation.Configuration;
+import org.magicmarvel.spring.context.annotation.Value;
 
 @Configuration
 public class SpecifyInitConfiguration {

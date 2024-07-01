@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.init;
 
 import jakarta.annotation.PostConstruct;
-import org.magicmarvel.handWriteSpring.annotation.Component;
-import org.magicmarvel.handWriteSpring.annotation.Value;
+import org.magicmarvel.spring.context.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Value;
 
 @Component
 public class AnnotationInitBean {

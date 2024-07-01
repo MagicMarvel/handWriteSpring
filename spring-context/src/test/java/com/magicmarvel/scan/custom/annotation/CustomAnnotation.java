@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.custom.annotation;
 
 
-import org.magicmarvel.handWriteSpring.annotation.AliasFor;
-import org.magicmarvel.handWriteSpring.annotation.Component;
+import org.magicmarvel.spring.context.annotation.AliasFor;
+import org.magicmarvel.spring.context.annotation.Component;
 
 import java.lang.annotation.*;
 

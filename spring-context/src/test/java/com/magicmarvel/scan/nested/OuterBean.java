@@ -1,7 +1,7 @@
 package com.magicmarvel.scan.nested;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Component;
 
 @Component
 public class OuterBean {

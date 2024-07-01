@@ -1,8 +1,8 @@
 package com.magicmarvel.scan.primary;
 
 
-import org.magicmarvel.handWriteSpring.annotation.Component;
-import org.magicmarvel.handWriteSpring.annotation.Primary;
+import org.magicmarvel.spring.context.annotation.Component;
+import org.magicmarvel.spring.context.annotation.Primary;
 
 @Primary
 @Component
