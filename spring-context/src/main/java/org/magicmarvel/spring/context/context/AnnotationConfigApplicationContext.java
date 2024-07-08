@@ -19,7 +19,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-public class AnnotationConfigApplicationContext implements ConfigurableApplicationContext {
+public class AnnotationConfigApplicationContext implements ConfigurableApplicationContext, ApplicationContext {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final PropertyResolver propertyResolver;
@@ -140,17 +140,19 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         beans.values().stream().filter(BeanDefinition::isConfigurator).sorted().forEach(bean -> {
             try {
                 createBeanAsEarlySingleton(bean);
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
+                     NoSuchMethodException e) {
                 throw new RuntimeException(e);
             }
         });
 
-        // 2. 创建所有BeanPostProcessor
+        // 2. 创建所有BeanPostProcessor的定义
         beans.values().stream().filter(BeanDefinition::isBeanPostProcessor).sorted().forEach(bean -> {
             try {
                 createBeanAsEarlySingleton(bean);
                 beanPostProcessors.add((BeanPostProcessor) bean.getInstance());
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
+                     NoSuchMethodException e) {
                 throw new RuntimeException(e);
             }
         });
@@ -158,16 +160,23 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         // 3. 把所有的bean都实例化出来
         beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(bean -> {
             try {
+                // 这里会执行BeanPostProcessor，有些BeanPostProcessor可能会手动创建其他的bean实例用来调用的
+                // 注意这个包的测试用例 com.magicmarvel.spring.aop.metric
                 createBeanAsEarlySingleton(bean);
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
+                     NoSuchMethodException e) {
                 throw new RuntimeException(e);
             }
         });
     }
 
     /**
-     * 创建Bean的实例，如果有循环依赖，会抛出异常
+     * 创建Bean的实例，可以重复调用，如果之前创建过了，会返回之前创建的实例
+     * <Br/>
+     * 如果有循环依赖，会抛出异常
+     * <Br/>
      * 最终的实例会直接放到BeanDefinition里，也会直接返回出来
+     * <Br/>
      * 代理前的实例（和BeanPostProcessor有关那种）会放在BeanDefinition的originInstance里
      *
      * @param bean Bean的定义
@@ -177,7 +186,10 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
      * @throws IllegalAccessException    无法访问构造函数或者工厂方法
      */
     @Override
-    public Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException {
+    public Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException {
+        if (bean.getInstance() != null) {
+            return bean.getInstance();
+        }
         if (this.creatingBeanNames.contains(bean.getName())) {
             throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
         }
@@ -467,7 +479,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                     String.format("Autowire required type '%s' but bean '%s' has actual type '%s'.", requiredType.getName(),
                             name, def.getBeanClass().getName()));
         }
-        return null;
+        return def;
     }
 
     /**

@@ -2,6 +2,9 @@ package org.magicmarvel.spring.context.context;
 
 import java.util.List;
 
+/**
+ * ApplicationContext接口定义了IoC容器的基本功能，用于客户端调用
+ */
 public interface ApplicationContext extends AutoCloseable {
     // 是否存在指定name的Bean？
     boolean containsBean(String name);

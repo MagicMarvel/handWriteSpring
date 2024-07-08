@@ -7,11 +7,16 @@ import java.util.Objects;
 
 public class ApplicationContextUtils {
 
-    private static ApplicationContext applicationContext = null;
+    private static AnnotationConfigApplicationContext applicationContext = null;
 
     @Nonnull
     public static ApplicationContext getRequiredApplicationContext() {
         return Objects.requireNonNull(getApplicationContext(), "ApplicationContext is not set.");
+    }
+
+    @Nonnull
+    public static ConfigurableApplicationContext getRequiredConfigurableApplicationContext() {
+        return Objects.requireNonNull(getConfigurableApplicationContext(), "ConfigurableApplicationContext is not set.");
     }
 
     @Nullable
@@ -19,7 +24,12 @@ public class ApplicationContextUtils {
         return applicationContext;
     }
 
-    static void setApplicationContext(ApplicationContext ctx) {
+    @Nullable
+    public static ConfigurableApplicationContext getConfigurableApplicationContext() {
+        return applicationContext;
+    }
+
+    static void setApplicationContext(AnnotationConfigApplicationContext ctx) {
         applicationContext = ctx;
     }
 

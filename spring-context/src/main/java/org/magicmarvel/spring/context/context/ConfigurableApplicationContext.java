@@ -5,7 +5,10 @@ import jakarta.annotation.Nullable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
-public interface ConfigurableApplicationContext extends ApplicationContext {
+/**
+ * 用于相比于客户端专用API的ApplicationContext，这里还有一些框架需要用的API
+ */
+public interface ConfigurableApplicationContext {
 
     List<BeanDefinition> findBeanDefinitions(Class<?> type);
 
@@ -18,5 +21,5 @@ public interface ConfigurableApplicationContext extends ApplicationContext {
     @Nullable
     BeanDefinition findBeanDefinition(String name, Class<?> requiredType);
 
-    Object createBeanAsEarlySingleton(BeanDefinition def) throws InvocationTargetException, InstantiationException, IllegalAccessException;
+    Object createBeanAsEarlySingleton(BeanDefinition def) throws InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException;
 }
