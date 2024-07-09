@@ -13,19 +13,36 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
 /**
- * 客户端需要提供一个类，继承该抽象类，会自动创建BeanPostProcessor，并查找给定注解的value值，以找到InvocationHandler
+ * Abstract class designed to automatically create a {@link BeanPostProcessor} that searches for beans annotated with a specific annotation.
+ * It then uses an {@link InvocationHandler} found by the annotation's value to create a proxy for the bean.
+ * Subclasses must specify the annotation type they are interested in by extending this class with the annotation type as the generic parameter.
  *
- * @param <A> 需要创建BeanPostProcessor的注解
+ * @param <A> The annotation type used to identify beans that should be processed by this {@link BeanPostProcessor}.
  */
 public abstract class AnnotationProxyBeanPostProcessor<A extends Annotation> implements BeanPostProcessor {
 
     private final ProxyResolver proxyResolver = new ProxyResolver();
     private final Class<A> type;
 
+    /**
+     * Constructor that initializes the {@link AnnotationProxyBeanPostProcessor} by determining the annotation type {@code A}.
+     * This is achieved by inspecting the generic type parameter of the subclass.
+     */
     public AnnotationProxyBeanPostProcessor() {
         this.type = getParameterizedType();
     }
 
+    /**
+     * Processes a bean before its initialization phase, searching for the specified annotation.
+     * If the annotation is present, it attempts to create a proxy for the bean using an {@link InvocationHandler} specified by the annotation's value.
+     *
+     * @param bean     The bean instance to process.
+     * @param beanName The name of the bean.
+     * @return The original bean or a proxy of the bean if the specified annotation is present and an {@link InvocationHandler} can be found.
+     * @throws NoSuchMethodException     If the annotation's value method cannot be found.
+     * @throws InvocationTargetException If the annotation's value method cannot be invoked.
+     * @throws IllegalAccessException    If the annotation's value method is inaccessible.
+     */
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Annotation anno = bean.getClass().getAnnotation(type);
@@ -50,24 +67,24 @@ public abstract class AnnotationProxyBeanPostProcessor<A extends Annotation> imp
     }
 
     /**
-     * 获取泛型（牛逼PLUS，没这么写过）
+     * Determines the class type of the annotation {@code A} by inspecting the generic type parameter of the subclass.
+     * This method uses reflection to inspect the superclass's type parameter and casts it to {@code Class<A>}.
      *
-     * @return 泛型的类类型
+     * @return The class type of the annotation {@code A}.
+     * @throws IllegalArgumentException If the subclass does not specify a generic type parameter or if the parameter is not a class type.
      */
     private Class<A> getParameterizedType() {
-        Type type = getClass().getGenericSuperclass();
-        if (!(type instanceof ParameterizedType pt)) {
-            throw new IllegalArgumentException("Class " + getClass().getName() + " does not have parameterized type.");
+        Type genericSuperclass = getClass().getGenericSuperclass();
+        if (!(genericSuperclass instanceof ParameterizedType parameterizedType)) {
+            throw new IllegalArgumentException("Class " + getClass().getName() + " must be parameterized with an annotation type");
         }
-        Type[] types = pt.getActualTypeArguments();
-        if (types.length != 1) {
-            throw new IllegalArgumentException("Class " + getClass().getName() + " has more than 1 parameterized types.");
+        Type[] typeArguments = parameterizedType.getActualTypeArguments();
+        if (typeArguments.length != 1) {
+            throw new IllegalArgumentException("Class " + getClass().getName() + " must have exactly one generic type parameter");
         }
-        Type r = types[0];
-        if (!(r instanceof Class<?>)) {
-            throw new IllegalArgumentException("Class " + getClass().getName() + " does not have parameterized type of class.");
+        if (!(typeArguments[0] instanceof Class)) {
+            throw new IllegalArgumentException("Type argument " + typeArguments[0] + " is not a class");
         }
-        return (Class<A>) r;
+        return (Class<A>) typeArguments[0];
     }
-
 }
