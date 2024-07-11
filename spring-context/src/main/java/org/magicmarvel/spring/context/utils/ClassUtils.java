@@ -55,7 +55,7 @@ public class ClassUtils {
                         return beanName;
                     }
                 } catch (InvocationTargetException | IllegalAccessException e) {
-                    throw new RuntimeException(e);
+                    throw new BeanDefinitionException("Error when get bean name from annotation", e);
                 }
             }
         }
@@ -104,7 +104,7 @@ public class ClassUtils {
                 }
             } else {
                 if (method.getAnnotation(annoClass) != null) {
-                    throw new RuntimeException("Duplicate @" + annoClass.getSimpleName() + " found on class " + clazz.getSimpleName());
+                    throw new BeanDefinitionException("Duplicate @" + annoClass.getSimpleName() + " found on class " + clazz.getSimpleName());
                 }
             }
         }

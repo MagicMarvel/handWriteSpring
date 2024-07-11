@@ -121,7 +121,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                 try {
                     method.invoke(nowInstance, param);
                 } catch (IllegalAccessException | InvocationTargetException e) {
-                    throw new RuntimeException(e);
+                    throw new BeanCreationException(e);
                 }
             }
         }
@@ -137,37 +137,18 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
      */
     private void createBeanInstances() {
         // 1. 把所有的Configuration拿出来先实例化他们，不然他们的工厂方法bean没法实例化
-        beans.values().stream().filter(BeanDefinition::isConfigurator).sorted().forEach(bean -> {
-            try {
-                createBeanAsEarlySingleton(bean);
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
-                     NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        beans.values().stream().filter(BeanDefinition::isConfigurator).sorted().forEach(this::createBeanAsEarlySingleton);
 
         // 2. 创建所有BeanPostProcessor的定义
         beans.values().stream().filter(BeanDefinition::isBeanPostProcessor).sorted().forEach(bean -> {
-            try {
-                createBeanAsEarlySingleton(bean);
-                beanPostProcessors.add((BeanPostProcessor) bean.getInstance());
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
-                     NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            }
+            createBeanAsEarlySingleton(bean);
+            beanPostProcessors.add((BeanPostProcessor) bean.getInstance());
         });
 
         // 3. 把所有的bean都实例化出来
-        beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(bean -> {
-            try {
-                // 这里会执行BeanPostProcessor，有些BeanPostProcessor可能会手动创建其他的bean实例用来调用的
-                // 注意这个包的测试用例 com.magicmarvel.spring.aop.metric
-                createBeanAsEarlySingleton(bean);
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
-                     NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        // 这里会执行BeanPostProcessor，有些BeanPostProcessor可能会手动创建其他的bean实例用来调用的
+        // 注意这个包的测试用例 com.magicmarvel.spring.aop.metric
+        beans.values().stream().filter(bean -> bean.getInstance() == null).sorted().forEach(this::createBeanAsEarlySingleton);
     }
 
     /**
@@ -181,72 +162,74 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
      *
      * @param bean Bean的定义
      * @return Bean的实例
-     * @throws InvocationTargetException 构造方法实例化对象抛出异常
-     * @throws InstantiationException    构造函数或者工厂函数调用出错
-     * @throws IllegalAccessException    无法访问构造函数或者工厂方法
      */
     @Override
-    public Object createBeanAsEarlySingleton(BeanDefinition bean) throws InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException {
-        if (bean.getInstance() != null) {
+    public Object createBeanAsEarlySingleton(BeanDefinition bean) {
+        try {
+            if (bean.getInstance() != null) {
+                return bean.getInstance();
+            }
+            if (this.creatingBeanNames.contains(bean.getName())) {
+                throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
+            }
+
+            Executable createFn = bean.getFactoryName() == null ?
+                    bean.getConstructor() : bean.getFactoryMethod();
+            if (createFn == null) {
+                throw new BeanCreationException("Cannot create " + bean.getName() + " instance cause it doesn't have constructor or factory method");
+            }
+
+
+            Object[] params = new Object[createFn.getParameterCount()];
+            Parameter[] parameters = createFn.getParameters();
+            for (int i = 0, parametersLength = parameters.length; i < parametersLength; i++) {
+                Parameter parameter = parameters[i];
+                // 在工厂方法返回一个Bean的时候，工厂方法的入参不需要AutoWired注解，Spring也应该找对应的注解注入进去
+                // 构造函数创建Bean的时候，也是适用的，不需要入参有AutoWired就能注入
+                if (parameter.isAnnotationPresent(Autowired.class) || parameter.getAnnotations().length == 0) {
+                    Class<?> type = parameter.getType();
+                    BeanDefinition paramBean = findBeanDefinition(type);
+                    if (paramBean == null) {
+                        throw new UnsatisfiedDependencyException("No bean found for type: " + type.getName());
+                    }
+                    Object paramBeanInstance = paramBean.getInstance();
+                    if (paramBeanInstance == null) {
+                        paramBeanInstance = createBeanAsEarlySingleton(paramBean);
+                    }
+                    params[i] = paramBeanInstance;
+                }
+                if (parameter.isAnnotationPresent(Value.class)) {
+                    Value value = parameter.getAnnotation(Value.class);
+                    params[i] = propertyResolver.getProperty(value.value(), parameter.getType());
+                }
+            }
+
+            Object instance = null;
+            if (bean.getConstructor() != null) {
+                Constructor<?> constructor = bean.getConstructor();
+                constructor.setAccessible(true);
+                instance = constructor.newInstance(params);
+            }
+
+            if (bean.getFactoryMethod() != null) {
+                Object originBean = this.getBean(bean.getFactoryMethod().getDeclaringClass());
+                Method factoryMethod = bean.getFactoryMethod();
+                factoryMethod.setAccessible(true);
+                instance = factoryMethod.invoke(originBean, params);
+            }
+
+            bean.setOriginInstance(instance);
+
+            // 调用BeanPostProcessor处理Bean:
+            for (BeanPostProcessor processor : beanPostProcessors) {
+                instance = processor.postProcessBeforeInitialization(instance, bean.getName());
+            }
+            bean.setInstance(instance);
             return bean.getInstance();
+        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
+                 IllegalAccessException e) {
+            throw new BeanCreationException(e);
         }
-        if (this.creatingBeanNames.contains(bean.getName())) {
-            throw new UnsatisfiedDependencyException("Circular dependency: " + bean.getName());
-        }
-
-        Executable createFn = bean.getFactoryName() == null ?
-                bean.getConstructor() : bean.getFactoryMethod();
-        if (createFn == null) {
-            throw new BeanCreationException("Cannot create " + bean.getName() + " instance cause it doesn't have constructor or factory method");
-        }
-
-
-        Object[] params = new Object[createFn.getParameterCount()];
-        Parameter[] parameters = createFn.getParameters();
-        for (int i = 0, parametersLength = parameters.length; i < parametersLength; i++) {
-            Parameter parameter = parameters[i];
-            // 在工厂方法返回一个Bean的时候，工厂方法的入参不需要AutoWired注解，Spring也应该找对应的注解注入进去
-            // 构造函数创建Bean的时候，也是适用的，不需要入参有AutoWired就能注入
-            if (parameter.isAnnotationPresent(Autowired.class) || parameter.getAnnotations().length == 0) {
-                Class<?> type = parameter.getType();
-                BeanDefinition paramBean = findBeanDefinition(type);
-                if (paramBean == null) {
-                    throw new UnsatisfiedDependencyException("No bean found for type: " + type.getName());
-                }
-                Object paramBeanInstance = paramBean.getInstance();
-                if (paramBeanInstance == null) {
-                    paramBeanInstance = createBeanAsEarlySingleton(paramBean);
-                }
-                params[i] = paramBeanInstance;
-            }
-            if (parameter.isAnnotationPresent(Value.class)) {
-                Value value = parameter.getAnnotation(Value.class);
-                params[i] = propertyResolver.getProperty(value.value(), parameter.getType());
-            }
-        }
-
-        Object instance = null;
-        if (bean.getConstructor() != null) {
-            Constructor<?> constructor = bean.getConstructor();
-            constructor.setAccessible(true);
-            instance = constructor.newInstance(params);
-        }
-
-        if (bean.getFactoryMethod() != null) {
-            Object originBean = this.getBean(bean.getFactoryMethod().getDeclaringClass());
-            Method factoryMethod = bean.getFactoryMethod();
-            factoryMethod.setAccessible(true);
-            instance = factoryMethod.invoke(originBean, params);
-        }
-
-        bean.setOriginInstance(instance);
-
-        // 调用BeanPostProcessor处理Bean:
-        for (BeanPostProcessor processor : beanPostProcessors) {
-            instance = processor.postProcessBeforeInitialization(instance, bean.getName());
-        }
-        bean.setInstance(instance);
-        return bean.getInstance();
     }
 
     /**

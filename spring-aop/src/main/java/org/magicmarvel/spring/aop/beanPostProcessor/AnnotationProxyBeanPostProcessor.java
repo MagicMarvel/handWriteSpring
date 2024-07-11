@@ -5,6 +5,8 @@ import org.magicmarvel.spring.context.context.ApplicationContextUtils;
 import org.magicmarvel.spring.context.context.BeanDefinition;
 import org.magicmarvel.spring.context.context.BeanPostProcessor;
 import org.magicmarvel.spring.context.context.ConfigurableApplicationContext;
+import org.magicmarvel.spring.context.exception.BeanCreationException;
+import org.magicmarvel.spring.context.exception.BeanDefinitionException;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
@@ -44,20 +46,20 @@ public abstract class AnnotationProxyBeanPostProcessor<A extends Annotation> imp
      * @throws IllegalAccessException    If the annotation's value method is inaccessible.
      */
     @Override
-    public Object postProcessBeforeInitialization(Object bean, String beanName) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
         Annotation anno = bean.getClass().getAnnotation(type);
         if (anno != null) {
             ConfigurableApplicationContext ctx = ApplicationContextUtils.getRequiredConfigurableApplicationContext();
             String value = anno.annotationType().getMethod("value").invoke(anno).toString();
             BeanDefinition def = ctx.findBeanDefinition(value, InvocationHandler.class);// ensure the bean exists
             if (def == null) {
-                throw new RuntimeException("InvocationHandler not found: " + value);
+                throw new BeanDefinitionException("InvocationHandler not found: " + value);
             }
             if (def.getInstance() == null) {
                 try {
                     ctx.createBeanAsEarlySingleton(def);
                 } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
-                    throw new RuntimeException(e);
+                    throw new BeanCreationException(e);
                 }
             }
             return proxyResolver.createProxy(bean, (InvocationHandler) def.getInstance());
@@ -74,6 +76,7 @@ public abstract class AnnotationProxyBeanPostProcessor<A extends Annotation> imp
      * @throws IllegalArgumentException If the subclass does not specify a generic type parameter or if the parameter is not a class type.
      */
     private Class<A> getParameterizedType() {
+        // Class only can represent `List`, but Type can represent `List<Integer>`
         Type genericSuperclass = getClass().getGenericSuperclass();
         if (!(genericSuperclass instanceof ParameterizedType parameterizedType)) {
             throw new IllegalArgumentException("Class " + getClass().getName() + " must be parameterized with an annotation type");

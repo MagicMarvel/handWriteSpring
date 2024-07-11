@@ -6,6 +6,7 @@ import net.bytebuddy.implementation.InvocationHandlerAdapter;
 import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 
 public class ProxyResolver {
     // ByteBuddy实例:
@@ -18,7 +19,7 @@ public class ProxyResolver {
      * @param handler 代理处理器（指示如何代理）
      * @return 被代理后的对象
      */
-    public <T> T createProxy(T bean, InvocationHandler handler) {
+    public <T> T createProxy(T bean, InvocationHandler handler) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         // 目标Bean的Class类型:
         Class<?> targetClass = bean.getClass();
         // 动态创建Proxy的Class:
@@ -38,14 +39,7 @@ public class ProxyResolver {
                 // 加载字节码:
                 .load(targetClass.getClassLoader()).getLoaded();
         // 创建Proxy实例:
-        Object proxy;
-        try {
-            proxy = proxyClass.getConstructor().newInstance();
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        Object proxy = proxyClass.getConstructor().newInstance();
         return (T) proxy;
     }
 

@@ -7,7 +7,7 @@ public interface BeanPostProcessor {
     /**
      * Invoked after new Bean().
      */
-    default Object postProcessBeforeInitialization(Object bean, String beanName) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    default Object postProcessBeforeInitialization(Object bean, String beanName) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
         return bean;
     }
 
